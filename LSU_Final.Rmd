@@ -1,0 +1,366 @@
+---
+title: "The MIBE-LSU challenge"
+author: "Om Ajay Karthik"
+date: "3/10/2021"
+output: html_document
+---
+
+This report consists of detailed analyses of food delivery scene in London evaluated based on both the datasheets, one with the restaurant data and another with restaurant delivery time details. Using R, I have tried to analyze various relationships and extract the required details. I am presenting the detailed analysis below.
+
+
+
+Restaurants Information
+In this section, you will analyze the Restaurant information dataset with the objective of answering the following questions:
+
+1. Present a column chart with the top 10 neighborhoods by the number of restaurants.
+2. Present a column chart with the top 10 neighborhoods by restaurant review score.
+3. Compute the top 10 biggest chains. Present the results in a tabular format. (Use the column rest_brand to determine restaurants of the same brand)
+4. Compute the average menu price and the number of menu items for each restaurant. (The rest_menu_item_price column is a list of characters. You might want to use the by_row and map functions)
+5. Present in a bar chart the number of items on the menu for the five most expensive and cheapest restaurants. (The number of items can be determined by counting the elements in the rest_menu_item_price column)
+
+
+Installing necessary packages
+```{r}
+ #install.packages('ggplot2')
+ #install.packages('dplyr')
+ #install.packages("tidyverse")
+ 
+ #install.packages("xlsx")
+ #install.packages('expss')
+ #install.packages('gridExtra')
+ #install.packages('purrrlyr')
+ #install.packages('ggpubr')
+ #install.packages('data.table')
+```
+
+Importing necessary libraries
+```{r}
+library(ggpubr)
+library(ggplot2)
+library(dplyr)
+library(gridExtra)
+library(tidyverse)
+library(purrrlyr)
+library(data.table)
+```
+
+Imporing datasets
+
+```{r}
+resturants_mibe <- readRDS("C:/Users/Om Ajay Karthik/Desktop/LSU/resturants-mibe.rds")
+delivery_mibe <- readRDS("C:/Users/Om Ajay Karthik/Desktop/LSU/delivery-mibe.rds")
+```
+
+### 1. Present a column chart with the top 10 neighborhoods by the number of restaurants.
+
+```{r}
+freq_rest_neighborhood= count(resturants_mibe, rest_neighborhood)
+freq_rest_neighborhood_desc <-freq_rest_neighborhood[order(-freq_rest_neighborhood$n),]
+freq_rest_neighborhood_desc_top_n = head(freq_rest_neighborhood_desc, n=10)
+
+ggplot(freq_rest_neighborhood_desc_top_n, aes(x = reorder(rest_neighborhood, -n), y = n)) + 
+  geom_bar(stat = "identity") +
+  geom_bar(stat="identity", fill="steelblue")+
+  geom_text(aes(label=n), vjust=1.6, color="white", size=3.5)+
+  labs(title = "Top 10 neighbourhood by number of restaurant") +
+  xlab("Restaurant Neighbourhood ") +
+  ylab("Count") +
+  theme_test()
+```
+
+### 2. Present a column chart with the top 10 neighborhoods by restaurant review score.
+
+```{r}
+topn_by_review = head(resturants_mibe  %>%
+  filter(!is.na(rest_rating))  %>% arrange(-rest_rating,rest_neighborhood) %>% select(rest_neighborhood,rest_rating) %>% unique(),n=10)
+
+ggplot(topn_by_review, aes(x = reorder(rest_neighborhood, -rest_rating), y = rest_rating)) + 
+  geom_bar(stat="identity", fill="darkgreen")+
+  geom_text(aes(label=rest_rating), vjust=1.6, color="white", size=5)+
+  labs(title = "Top 10 Neighbourhood by restaurant review score") +
+  xlab("Restaurant Neighbourhood") +
+  ylab("Rating") +
+  theme_bw()
+```
+  
+### 3. Compute the top 10 biggest chains. Present the results in a tabular format. (Use the column rest_brand to determine restaurants of the same brand)
+
+```{r}
+graphics.off()
+biggest_chains = resturants_mibe %>% filter(!is.na(rest_brand)) %>%  count(.,rest_brand) 
+names(biggest_chains)[1] <- "Restaurant_Brand"
+names(biggest_chains)[2] <- "Count"
+biggest_chains_desc <-biggest_chains[order(-biggest_chains$Count),]
+biggest_chains_desc_top_n = head(biggest_chains_desc, n=10)
+
+```
+
+Custom display of of the table since Rmd has a bug while displaying this code:::grid.draw(biggest_chains_desc_top_n):::
+
+```{r, results='asis'}
+writeLines("td, th { padding : 6px } th { background-color : brown ; color : white; border : 1px solid white; } td { color : brown ; border : 1px solid brown }", con = "mystyle.css")
+dset1 <- head(biggest_chains_desc_top_n,n=10)
+knitr::kable(dset1, format = "html")
+
+
+```
+
+
+
+# 
+### 4. Compute the average menu price and the number of menu items for each restaurant (The rest_menu_item_price column is a list of characters. You might want to use the by_row and map functions)
+
+```{r}
+resturants_mibe_rest_menu_item_price_mean = resturants_mibe %>% 
+  select(rest_name,rest_brand,rest_menu_item_price) %>%
+  by_row(..f = function(this_row) {
+    this_row[3] %>% unlist %>% mean})
+
+names(resturants_mibe_rest_menu_item_price_mean)[4] <- "Average_price"
+
+resturants_mibe_rest_menu_item_price_length = resturants_mibe %>%
+  select(rest_name,rest_brand,rest_menu_item_price) %>%
+  by_row(..f = function(this_row) {
+    this_row[3] %>% unlist %>% length()})
+
+names(resturants_mibe_rest_menu_item_price_length)[4] <- "Count_of_menu_items"
+
+```
+
+
+#### Average menu price for each resturant(printing only head of 5(top 5))
+
+```{r, results='asis'}
+
+
+dset1 <- head(resturants_mibe_rest_menu_item_price_mean,n=5)
+knitr::kable(dset1, format = "html")
+
+```
+
+### No of items on the menu for each resturant (printing only head of 5(top 5))
+
+```{r, results='asis'}
+dset1 <- head(resturants_mibe_rest_menu_item_price_length,n=5)
+knitr::kable(dset1, format = "html")
+
+```
+
+
+### 5. Present in a bar chart the number of items on the menu for the five most expensive and cheapest restaurants.(The number of items can be determined by counting the elements in the rest_menu_item_price column)
+```{r}
+
+
+menu_item_price_sum = resturants_mibe %>% select(rest_name,rest_neighborhood,rest_menu_item_price) %>% filter(!is.na(rest_menu_item_price )) %>% by_row(..f = function(this_row) {
+  this_row[3] %>% unlist %>% sum()}) 
+
+names(menu_item_price_sum)[4] <- "sum_of_price"
+menu_item_price_sum$sum_of_price = as.numeric(as.character(menu_item_price_sum$sum_of_price))
+
+
+menu_item_sum_top_5 = head(arrange(menu_item_price_sum,desc(sum_of_price)), n = 5)
+menu_item_sum_bottom_5 = head(arrange(menu_item_price_sum,sum_of_price), n = 5)
+
+expensive = ggplot(menu_item_sum_top_5, aes(x = reorder(rest_name, -sum_of_price), y = sum_of_price)) + 
+  geom_bar(stat="identity", fill="slateblue")+
+  geom_text(aes(label=sum_of_price), vjust=1.5, color="white", size=5)+
+  labs(title = "Top 5 most expensive restaurants") +
+  xlab("Restaurant Name") +
+  ylab("Cost") +
+  theme_bw()
+
+cheapest = ggplot(menu_item_sum_bottom_5, aes(x = reorder(rest_name, sum_of_price), y = sum_of_price)) + 
+  geom_bar(stat="identity", fill="red")+
+  geom_text(aes(label=sum_of_price), vjust=1.4, color="white", size=5)+
+  labs(title = "Top 5 most cheap restaurants") +
+  xlab("Restaurant Name") +
+  ylab("Cost") +
+  theme_bw()
+
+
+grid.arrange(expensive, cheapest)
+
+```
+
+# Resturant Delivery Times 
+## Imporing datasets
+
+```{r}
+resturants_mibe <- readRDS("C:/Users/Om Ajay Karthik/Desktop/LSU/resturants-mibe.rds")
+delivery_mibe <- readRDS("C:/Users/Om Ajay Karthik/Desktop/LSU/delivery-mibe.rds")
+```
+
+
+Right outer join table and create a duplicate dataframe
+
+```{r}
+resturant_delivery = merge(x = resturants_mibe, y = delivery_mibe, by.x='restaurant_id', by.y='rest_key', all.y = TRUE)
+
+rest_delivery_merged_subset = resturant_delivery %>% select(restaurant_id,rest_name,rest_neighborhood,rest_postcode,neighborhood_name,rest_rating,rest_delivery_time_min)
+```
+
+
+
+### 1. Count the number of neighborhoods where each restaurant delivers. (Each restaurant can deliver to multiple neighborhoods, independently from here the restaurants is physically located)
+
+
+```{r}
+neighbourhoods_delivery_count = rest_delivery_merged_subset %>% 
+  select(rest_name,neighborhood_name)   %>%
+  group_by(rest_name,neighborhood_name) %>%
+  unique() %>%
+  summarise(n = n()) %>% count()
+
+names(neighbourhoods_delivery_count)[1] <- "Restaurant Name"
+names(neighbourhoods_delivery_count)[2] <- "No of Neighbourhood Delivery by Resturant"
+
+
+```
+
+```{r, results='asis'}
+writeLines("td, th { padding : 6px } th { background-color : brown ; color : white; border : 1px solid white; } td { color : brown ; border : 1px solid brown }", con = "mystyle.css")
+dset1 <- head(neighbourhoods_delivery_count,n=10)
+knitr::kable(dset1, format = "html")
+
+```
+
+### 2. Present in a bar chart the top 15 neighborhoods by the number of restaurants where restaurants make deliveries.(You will need to count the number of restaurants that deliver to each neighborhood)
+
+
+```{r, results='asis'}
+restaurants_per_neighbourhood = rest_delivery_merged_subset %>%
+  select(rest_name,neighborhood_name)   %>%
+  group_by(neighborhood_name,rest_name) %>%
+  unique() %>%
+  summarise(n = n()) %>%
+  count()%>% 
+  arrange(-n)
+
+names(restaurants_per_neighbourhood)[2] <- "No_of_Restaurants"
+
+top_n_restaurants_per_neighbourhood = head(restaurants_per_neighbourhood,n=15)
+ggplot(top_n_restaurants_per_neighbourhood, aes(x = reorder(neighborhood_name, -No_of_Restaurants), y = No_of_Restaurants)) + 
+  geom_bar(stat="identity", fill="steelblue4")+
+  geom_text(aes(label=No_of_Restaurants), vjust=1.5, color="white", size=5)+
+  labs(title = "Top 15 neighborhoods by the number of restaurants") +
+  xlab("Neighborhoods") +
+  ylab("Number of Restaurants") +
+  theme_bw()
+
+```
+
+
+
+### 3. Compute the average delivery time for each restaurant. (Compute the average of all neighborhoods the restaurant delivers)
+
+```{r, results='asis'}
+resturant_avg_delivery_time = rest_delivery_merged_subset %>%
+  select(rest_name,neighborhood_name,rest_delivery_time_min)   %>%
+  filter(!is.na(rest_delivery_time_min)) %>% 
+  group_by(rest_name) %>%
+  summarise(average_delivery_time = mean(rest_delivery_time_min))
+  ```
+  
+  
+  ```{r, results='asis'}
+writeLines("td, th { padding : 6px } th { background-color : brown ; color : white; border : 1px solid white; } td { color : brown ; border : 1px solid brown }", con = "mystyle.css")
+dset1 <- head(resturant_avg_delivery_time,n=50)
+knitr::kable(dset1, format = "html")
+
+```
+
+
+### 4. Present in tabular format the top 20 restaurants by fasted average delivery time.In the same table, present the rating score, and postcode.
+
+  ```{r, results='asis'}
+resturant_avg_delivery_time_rating_postcode = rest_delivery_merged_subset %>%
+  select(rest_name,neighborhood_name,rest_rating,rest_delivery_time_min,rest_postcode)   %>%
+  group_by(rest_name) %>%
+  unique() %>%
+  summarise(rest_name,neighborhood_name,rest_rating,rest_delivery_time_min,rest_postcode,average_delivery_time = mean(rest_delivery_time_min))
+
+resturant_avg_delivery_time_rating_postcode_desc <-resturant_avg_delivery_time_rating_postcode[order(resturant_avg_delivery_time_rating_postcode$average_delivery_time),]
+resturant_avg_delivery_time_rating_postcode_desc_top_n = resturant_avg_delivery_time_rating_postcode_desc %>% select(rest_name,rest_postcode,neighborhood_name,rest_rating,average_delivery_time) %>% head(., n=20)
+
+
+
+```
+
+  ```{r, results='asis'}
+writeLines("td, th { padding : 6px } th { background-color : brown ; color : white; border : 1px solid white; } td { color : brown ; border : 1px solid brown }", con = "mystyle.css")
+dset1 <- head(resturant_avg_delivery_time_rating_postcode_desc_top_n,n=50)
+knitr::kable(dset1, format = "html")
+
+```
+
+# Open analysis
+## How can we widen the food delivery market and improve customer experience.
+
+
+Importing necessary libraries
+```{r}
+library(ggpubr)
+library(ggplot2)
+library(dplyr)
+library(gridExtra)
+library(tidyverse)
+library(purrrlyr)
+library(data.table)
+```
+
+Imporing datasets
+
+```{r}
+resturants_mibe <- readRDS("C:/Users/Om Ajay Karthik/Desktop/LSU/resturants-mibe.rds")
+delivery_mibe <- readRDS("C:/Users/Om Ajay Karthik/Desktop/LSU/delivery-mibe.rds")
+
+resturant_delivery = merge(x = resturants_mibe, y = delivery_mibe, by.x='restaurant_id', by.y='rest_key', all.y = TRUE)
+
+rest_delivery_merged_subset = resturant_delivery %>% select(restaurant_id,rest_name,rest_neighborhood,rest_postcode,neighborhood_name,rest_rating,rest_delivery_time_min)
+
+```
+
+
+```{r}
+#summary(resturants_mibe) 
+```
+
+ restaurant_id     rest_name          rest_brand        rest_postcode      rest_neighborhood   rest_rating   
+ Min.   :     3   Length:5786        Length:5786        Length:5786        Length:5786        Min.   :1.800  
+ 1st Qu.: 62488   Class :character   Class :character   Class :character   Class :character   1st Qu.:4.200  
+ Median :116654   Mode  :character   Mode  :character   Mode  :character   Mode  :character   Median :4.400  
+ Mean   :112608                                                                               Mean   :4.355  
+ 3rd Qu.:167852                                                                               3rd Qu.:4.600  
+ Max.   :223928                                                                               Max.   :5.000  
+                                                                                              NA's   :850  
+
+resturant_delivery = merge(x = resturants_mibe, y = delivery_mibe, by.x='restaurant_id', by.y='rest_key', all.y = TRUE)
+
+ 
+                                                                                        
+  ```{r, results='asis'}
+resturant_avg_delivery_time_rating_postcode = rest_delivery_merged_subset %>%
+  select(rest_name,neighborhood_name,rest_rating,rest_delivery_time_min,rest_postcode)   %>%
+  group_by(rest_name) %>%
+  unique() %>%
+  summarise(rest_name,neighborhood_name,rest_rating,rest_delivery_time_min,rest_postcode,average_delivery_time = mean(rest_delivery_time_min))
+
+resturant_avg_delivery_time_rating_postcode_desc <-resturant_avg_delivery_time_rating_postcode[order(-resturant_avg_delivery_time_rating_postcode$average_delivery_time),]
+resturant_avg_delivery_time_rating_postcode_desc_top_n = resturant_avg_delivery_time_rating_postcode_desc %>% select(rest_name,rest_postcode,neighborhood_name,rest_rating,average_delivery_time) %>% head(., n=20)
+```
+
+  ```{r, results='asis'}
+writeLines("td, th { padding : 6px } th { background-color : brown ; color : white; border : 1px solid white; } td { color : brown ; border : 1px solid brown }", con = "mystyle.css")
+dset1 <- head(resturant_avg_delivery_time_rating_postcode_desc_top_n,n=50)
+knitr::kable(dset1, format = "html")
+
+```
+
+###  Based on the table above, which shows the average delivery time of 20 restaurants that have highest average delivery time, and the top 20 is from the restaurant chain too that take more than 120 minutes to deliver. While conducting the analysis we realize that there are 957 restaurants that have average delivery time more than 60 minutes. So, to improve the customer experience, focus should be on getting these food chains and restaurants to deliver within an hour so that they can retain customers and also attract new customers.
+
+### Also, another analysis on total price versus average rating (considering the total menu items) shows that there are restaurants that are too expensive and also have low rating. Improving the price structure and improving the quality of food and better promotion to the restaurants that are cheap can fetch better business by improving customer experience.
+
+
+
+
+
