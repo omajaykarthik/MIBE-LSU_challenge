@@ -1,0 +1,72 @@
+---
+title: "EDA_LSU"
+author: "Om Ajay Karthik"
+date: "3/10/2021"
+output: html_document
+---
+
+## How can we widen the food delivery market and improve customer experience.
+
+
+Importing necessary libraries
+```{r}
+library(ggpubr)
+library(ggplot2)
+library(dplyr)
+library(gridExtra)
+library(tidyverse)
+library(purrrlyr)
+library(data.table)
+```
+
+Imporing datasets
+
+```{r}
+resturants_mibe <- readRDS("C:/Users/Om Ajay Karthik/Desktop/LSU/resturants-mibe.rds")
+delivery_mibe <- readRDS("C:/Users/Om Ajay Karthik/Desktop/LSU/delivery-mibe.rds")
+
+resturant_delivery = merge(x = resturants_mibe, y = delivery_mibe, by.x='restaurant_id', by.y='rest_key', all.y = TRUE)
+
+rest_delivery_merged_subset = resturant_delivery %>% select(restaurant_id,rest_name,rest_neighborhood,rest_postcode,neighborhood_name,rest_rating,rest_delivery_time_min)
+
+```
+
+
+```{r}
+#summary(resturants_mibe) 
+```
+
+ restaurant_id     rest_name          rest_brand        rest_postcode      rest_neighborhood   rest_rating   
+ Min.   :     3   Length:5786        Length:5786        Length:5786        Length:5786        Min.   :1.800  
+ 1st Qu.: 62488   Class :character   Class :character   Class :character   Class :character   1st Qu.:4.200  
+ Median :116654   Mode  :character   Mode  :character   Mode  :character   Mode  :character   Median :4.400  
+ Mean   :112608                                                                               Mean   :4.355  
+ 3rd Qu.:167852                                                                               3rd Qu.:4.600  
+ Max.   :223928                                                                               Max.   :5.000  
+                                                                                              NA's   :850  
+
+resturant_delivery = merge(x = resturants_mibe, y = delivery_mibe, by.x='restaurant_id', by.y='rest_key', all.y = TRUE)
+
+ 
+                                                                                        
+  ```{r, results='asis'}
+resturant_avg_delivery_time_rating_postcode = rest_delivery_merged_subset %>%
+  select(rest_name,neighborhood_name,rest_rating,rest_delivery_time_min,rest_postcode)   %>%
+  group_by(rest_name) %>%
+  unique() %>%
+  summarise(rest_name,neighborhood_name,rest_rating,rest_delivery_time_min,rest_postcode,average_delivery_time = mean(rest_delivery_time_min))
+
+resturant_avg_delivery_time_rating_postcode_desc <-resturant_avg_delivery_time_rating_postcode[order(-resturant_avg_delivery_time_rating_postcode$average_delivery_time),]
+resturant_avg_delivery_time_rating_postcode_desc_top_n = resturant_avg_delivery_time_rating_postcode_desc %>% select(rest_name,rest_postcode,neighborhood_name,rest_rating,average_delivery_time) %>% head(., n=20)
+```
+
+  ```{r, results='asis'}
+writeLines("td, th { padding : 6px } th { background-color : brown ; color : white; border : 1px solid white; } td { color : brown ; border : 1px solid brown }", con = "mystyle.css")
+dset1 <- head(resturant_avg_delivery_time_rating_postcode_desc_top_n,n=50)
+knitr::kable(dset1, format = "html")
+
+```
+
+###  Based on the table above, which shows the average delivery time of 20 restaurants that have highest average delivery time, and the top 20 is from the restaurant chain too that take more than 120 minutes to deliver. While conducting the analysis we realize that there are 957 restaurants that have average delivery time more than 60 minutes. So, to improve the customer experience, focus should be on getting these food chains and restaurants to deliver within an hour so that they can retain customers and also attract new customers.
+
+### Also, another analysis on total price versus average rating (considering the total menu items) shows that there are restaurants that are too expensive and also have low rating. Improving the price structure and improving the quality of food and better promotion to the restaurants that are cheap can fetch better business by improving customer experience.

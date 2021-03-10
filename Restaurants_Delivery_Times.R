@@ -1,0 +1,106 @@
+##################################  Insallation of packages and importing required libraries  ###############
+install.packages('ggplot2')
+install.packages('dplyr')
+install.packages("tidyverse")
+
+install.packages("xlsx")
+install.packages('expss')
+install.packages('gridExtra')
+install.packages('purrrlyr')
+install.packages('ggpubr')
+install.packages('data.table')
+
+
+library(ggpubr)
+library(ggplot2)
+library(dplyr)
+library(gridExtra)
+library(tidyverse)
+library(purrrlyr)
+library(data.table)
+
+################################### Importing data and  basic dataset description ############################
+
+resturants_mibe <- readRDS("C:/Users/Om Ajay Karthik/Desktop/LSU/resturants-mibe.rds")
+delivery_mibe <- readRDS("C:/Users/Om Ajay Karthik/Desktop/LSU/delivery-mibe.rds")
+
+##############################################################################################################
+
+
+# Restaurants Delivery Times
+# In this section, you will analyze the restaurant's delivery times. 
+#To perform the following analysis,you will need to join the Restaurants information and Restaurants delivery time datasets
+#using their restaurant_id and rest_key primary keys. Answer the following questions:
+
+
+resturant_delivery = merge(x = resturants_mibe, y = delivery_mibe, by.x='restaurant_id', by.y='rest_key', all.y = TRUE)
+
+rest_delivery_merged_subset = resturant_delivery %>% select(restaurant_id,rest_name,rest_neighborhood,rest_postcode,neighborhood_name,rest_rating,rest_delivery_time_min)
+
+
+# 1. Count the number of neighborhoods where each restaurant delivers. 
+#(Each restaurant can deliver to multiple neighborhoods, independently from here the restaurants is physically located)
+
+
+
+neighbourhoods_delivery_count = rest_delivery_merged_subset %>% 
+  select(rest_name,neighborhood_name)   %>%
+  group_by(rest_name,neighborhood_name) %>%
+  unique() %>%
+  summarise(n = n()) %>% count()
+
+names(neighbourhoods_delivery_count)[1] <- "Restaurant Name"
+names(neighbourhoods_delivery_count)[2] <- "No of Neighbourhood Delivery by Resturant"
+view(neighbourhoods_delivery_count)
+########################################################################################################################
+
+# 2. Present in a bar chart the top 15 neighborhoods by the number of restaurants where restaurants make deliveries.
+#(You will need to count the number of restaurants that deliver to each neighborhood)
+
+restaurants_per_neighbourhood = rest_delivery_merged_subset %>%
+  select(rest_name,neighborhood_name)   %>%
+  group_by(neighborhood_name,rest_name) %>%
+  unique() %>%
+  summarise(n = n()) %>%
+  count()%>% 
+  arrange(-n)
+
+names(restaurants_per_neighbourhood)[2] <- "No_of_Restaurants"
+
+top_n_restaurants_per_neighbourhood = head(restaurants_per_neighbourhood,n=15)
+ggplot(top_n_restaurants_per_neighbourhood, aes(x = reorder(neighborhood_name, -No_of_Restaurants), y = No_of_Restaurants)) + 
+  geom_bar(stat="identity", fill="steelblue4")+
+  geom_text(aes(label=No_of_Restaurants), vjust=1.5, color="white", size=5)+
+  labs(title = "Top 15 neighborhoods by the number of restaurants") +
+  xlab("Neighborhoods") +
+  ylab("Number of Restaurants") +
+  theme_bw()
+
+
+# 3. Compute the average delivery time for each restaurant. (Compute the average of all neighborhoods the restaurant delivers)
+
+resturant_avg_delivery_time = rest_delivery_merged_subset %>%
+  select(rest_name,neighborhood_name,rest_delivery_time_min)   %>%
+  filter(!is.na(rest_delivery_time_min)) %>% 
+  group_by(rest_name) %>%
+  summarise(average_delivery_time = mean(rest_delivery_time_min))
+
+
+# 4. Present in tabular format the top 20 restaurants by fasted average delivery time.
+#In the same table, present the rating score, and postcode.
+
+resturant_avg_delivery_time_rating_postcode = rest_delivery_merged_subset %>%
+  select(rest_name,neighborhood_name,rest_rating,rest_delivery_time_min,rest_postcode)   %>%
+  group_by(rest_name) %>%
+  unique() %>%
+  summarise(rest_name,neighborhood_name,rest_rating,rest_delivery_time_min,rest_postcode,average_delivery_time = mean(rest_delivery_time_min))
+
+resturant_avg_delivery_time_rating_postcode_desc <-resturant_avg_delivery_time_rating_postcode[order(resturant_avg_delivery_time_rating_postcode$average_delivery_time),]
+resturant_avg_delivery_time_rating_postcode_desc_top_n = resturant_avg_delivery_time_rating_postcode_desc %>% select(rest_name,rest_postcode,neighborhood_name,rest_rating,average_delivery_time) %>% head(., n=20)
+
+
+graphics.off()
+grid.table(resturant_avg_delivery_time_rating_postcode_desc_top_n)
+
+
+
